@@ -24,9 +24,8 @@ type resourceResult struct {
 }
 
 type k8sStat struct {
-	object           metav1.Object
-	podStats         *podStats
-	trafficSplitInfo tsInfo
+	object   metav1.Object
+	podStats *podStats
 }
 
 type rKey struct {
@@ -39,16 +38,10 @@ type rKey struct {
 	Weight string
 }
 
-type tsInfo struct {
-	Name   string
-	Apex   string
-	Leaf   string
-	Weight string
-}
-
 const (
-	success = "success"
-	failure = "failure"
+	success  = "success"
+	failure  = "failure"
+	tsString = "trafficsplit"
 
 	reqQuery             = "sum(increase(response_total%s[%s])) by (%s, classification, tls)"
 	latencyQuantileQuery = "histogram_quantile(%s, sum(irate(response_latency_ms_bucket%s[%s])) by (le, %s))"
@@ -180,7 +173,7 @@ func (s *grpcServer) getKubernetesObjectStats(req *pb.StatSummaryRequest) (map[r
 			Type:      requestedResource.GetType(),
 		}
 
-		if requestedResource.GetType() == "trafficsplit" {
+		if requestedResource.GetType() == tsString {
 			tsAnnotations := metaObj.GetAnnotations()
 			ts1 := tsAnnotations["kubectl.kubernetes.io/last-applied-configuration"]
 			sec := map[string]interface{}{}
@@ -419,7 +412,7 @@ func (s *grpcServer) getStatMetrics(ctx context.Context, req *pb.StatSummaryRequ
 	stringifiedReqLabels := reqLabels.String()
 	stringifiedGroupBy := groupBy.String()
 
-	if req.Selector.Resource.Type == "trafficsplit" {
+	if req.Selector.Resource.Type == tsString {
 
 		re := regexp.MustCompile("trafficsplit")
 		stringifiedGroupBy = re.ReplaceAllString(stringifiedGroupBy, "authority")
@@ -427,7 +420,7 @@ func (s *grpcServer) getStatMetrics(ctx context.Context, req *pb.StatSummaryRequ
 	var results []promResult
 	var err error
 
-	if req.Selector.Resource.Type == "trafficsplit" {
+	if req.Selector.Resource.Type == tsString {
 		for key := range k8sObjects {
 			// use regex to look for any authority that matches the leaf service name -- this needs to be thought out since could return
 			// false positives
